@@ -1,0 +1,43 @@
+{
+  "apiVersion": "puddleworks.dev/app-spec/v1",
+  "kind": "AppSpec",
+  "name": "swamp-extension-checker",
+  "title": "Deterministic check: Does this repository have a LICENSE file?",
+  "specification": {
+    "purpose": "Say whether a git repository has a licence file at its root, which file it is, and the licence's SPDX name when GitHub reports one.",
+    "inputs": [
+      {
+        "name": "repo",
+        "type": "string",
+        "description": "A GitHub repository as owner/name or a github.com URL. Empty means check path instead.",
+        "required": false,
+        "default": ""
+      },
+      {
+        "name": "path",
+        "type": "string",
+        "description": "A local directory; the git repository it is in is checked at its working-tree root. Used when repo is empty.",
+        "required": false,
+        "default": "."
+      }
+    ],
+    "output": "One record: whether the repository has a licence file at its root, the file's path (or none), the licence's SPDX name when GitHub reports one, and where it was checked (the local working tree or the GitHub default branch). Outside a git repository it says so instead.",
+    "outOfScope": [
+      "Judging whether the licence is suitable, valid or compatible with dependencies",
+      "Licence files below the root, licence headers in source files and package-manifest licence fields",
+      "Adding or changing a licence file",
+      "The old Jev router registry (spikes/branch-protection-api/api/registry.ts in puddle-works/swamp-for-everything): puddlerouter's recipes now play that role"
+    ],
+    "settings": [],
+    "recordedBy": "user@example.com",
+    "recordedAt": "2026-10-29T23:31:55.371Z"
+  },
+  "delivery": {
+    "method": "workflow_form"
+  },
+  "source": {
+    "url": "http://127.0.0.1:3002/requests/afb8c437-bf4f-4fad-be6b-5204a34921e3",
+    "version": 1,
+    "specHash": "6e074ac7eedb53b0c5c3051df877f27aba0134075243a04560c2a9624429eb73"
+  }
+}

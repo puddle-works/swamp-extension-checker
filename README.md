@@ -1,54 +1,59 @@
-# puddle-template
+# Deterministic check: Does this repository have a LICENSE file?
 
-Template for a puddle repo ([ADR-004][adr]): one repo per puddle, created from
-this one. A repo made from it passes `make test` and a publish dry run before
-anything is written.
+Say whether a git repository has a licence file at its root, which file it is, and the licence's SPDX name when GitHub reports one.
 
-## What is in it
+## For the user
 
-| Path | What it is |
-|---|---|
-| `.swamp.yaml`, `.gitignore`, `CLAUDE.md` | Swamp repo files from `swamp repo init` |
-| `extensions/models/` | The puddle's extension and its tests. Ships with a placeholder `example.ts` |
-| `workflows/` | Swamp workflows. Each one needs a `workflow-*.yaml` file name, its own UUID `id`, and `maxReruns` and `maxWallClock` tags. swamp skips a file without the name or the id |
-| `manifest.yaml` | The extension's publish manifest (placeholder; `models:` lists bare file names) |
-| `contracts.ts` | Maps model instances that workflows read to the data they write |
-| `Makefile`, `puddle.mk` | `make test`, `contracts-check`, `guardrails-check`, `publish` |
-| `.github/workflows/ci.yml` | Tests plus the reusable checks and publish dry run from [puddle-tooling][tooling] |
-| `optional/launcher/` | Containerfile skeleton for a puddle that ships a launcher |
+Your builder will show you where to run it. Each run asks for the values below.
 
-## Make a puddle from it
+| What to enter | Kind | Default |
+|---|---|---|
+| A GitHub repository as owner/name or a github.com URL. Empty means check path instead. | string | empty |
+| A local directory; the git repository it is in is checked at its working-tree root. Used when repo is empty. | string | `"."` |
 
-Click **Use this template** on GitHub, or:
+**You get:** One record: whether the repository has a licence file at its root, the file's path (or none), the licence's SPDX name when GitHub reports one, and where it was checked (the local working tree or the GitHub default branch). Outside a git repository it says so instead.
 
-```sh
-gh repo create puddle-works/<slug> --template puddle-works/puddle-template --private
+## For the builder
+
+Built by puddleworks-factory from the app spec `swamp-extension-checker`. The
+agreed request and the app spec are in [`spec/`](spec/) in the source repo:
+request `afb8c437-bf4f-4fad-be6b-5204a34921e3`, version 1, hash
+`6e074ac7eedb53b0c5c3051df877f27aba0134075243a04560c2a9624429eb73`.
+Out of scope: judging whether a licence is suitable, licence files below the
+root, licence headers and package-manifest fields, and adding or changing a
+licence file.
+
+- Extension: `@puddleworks/swamp-extension-checker` in `extensions/models/swamp_extension_checker.ts`
+- Entry point: workflow `@puddleworks/swamp-extension-checker` in
+  `workflows/workflow-swamp-extension-checker.yaml`
+- Delivery method: `workflow_form`
+
+Create the model instance the workflow runs:
+
+```bash
+swamp model create @puddleworks/swamp-extension-checker swamp-extension-checker-model
 ```
 
-Then replace the placeholders:
+Run it:
 
-1. Rename the extension in `manifest.yaml`, `extensions/models/` and `contracts.ts`
-   (delete `example.ts`, its test and `workflows/workflow-example.yaml` once
-   yours exist).
-2. Rewrite this README and the puddle section of `CLAUDE.md`.
-3. Set `visibility:` in `manifest.yaml` (and `visibility:` in `ci.yml`). The repo's
-   visibility follows the extension's.
-4. Add the `SWAMP_API_KEY` and `SWAMP_SIGNIN_TOKEN` repository secrets (see
-   [puddle-tooling][tooling]) so the publish dry run can run.
-5. Run `swamp repo init --force --tool claude` so the repo gets its own `repoId`.
-
-## Checks
-
-```sh
-make test
-make contracts-check
-make guardrails-check
-make publish VISIBILITY=private DRY_RUN=1   # stops after the dry run
+```bash
+swamp workflow run @puddleworks/swamp-extension-checker
+swamp workflow run @puddleworks/swamp-extension-checker --input repo=owner/name
 ```
 
-`puddle.mk` fetches the checks from the puddle-tooling release named by
-`TOOLING_REF` (default `v0.1.1`). Move to a newer release by changing it there
-and the `@vX.Y.Z` and `tooling-ref` in `ci.yml` together.
+A local check needs `git` on the `PATH`. A GitHub check, and the SPDX name for a
+local repository whose origin is on GitHub, needs `gh` signed in.
 
-[adr]: https://github.com/puddle-works/puddleworks-apps/blob/main/docs/adr/ADR-004-one-repo-per-puddle.md
-[tooling]: https://github.com/puddle-works/puddle-tooling
+The package is also a recipe pack for `@puddleworks/recipes`: the workflow
+`@puddleworks/swamp-extension-checker-licence-recipe` answers "does owner/name
+have a licence?" from the router. It covers only a named GitHub repository,
+because the router runs recipes in its own repo rather than the one the question
+was asked from.
+
+Test it:
+
+```bash
+DENO=$(swamp doctor extensions --json | jq -r '.denoPath')
+$DENO check extensions/models/swamp_extension_checker.ts
+$DENO test --allow-read --allow-write extensions/models/
+```

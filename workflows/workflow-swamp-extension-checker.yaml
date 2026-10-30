@@ -1,0 +1,40 @@
+id: a34f785e-c03d-457c-b969-b61422735767
+name: "@puddleworks/swamp-extension-checker"
+description: "Say whether a git repository has a licence file at its root, which file it is, and the licence's SPDX name when GitHub reports one."
+version: 1
+tags:
+  puddle: "true"
+  maxReruns: "5"
+  maxWallClock: "30m"
+
+inputs:
+  type: object
+  properties:
+    repo:
+      type: string
+      description: "A GitHub repository as owner/name or a github.com URL. Empty means check path instead."
+      default: ""
+    path:
+      type: string
+      description: "A local directory; the git repository it is in is checked at its working-tree root. Used when repo is empty."
+      default: "."
+  required: []
+
+jobs:
+  - name: main
+    description: "Run swamp-extension-checker once with the user's inputs."
+    dependsOn: []
+    weight: 0
+    steps:
+      - name: run
+        description: "One record: whether the repository has a licence file at its root, the file's path (or none), the licence's SPDX name when GitHub reports one, and where it was checked (the local working tree or the GitHub default branch). Outside a git repository it says so instead."
+        dependsOn: []
+        weight: 0
+        allowFailure: false
+        task:
+          type: model_method
+          modelIdOrName: swamp-extension-checker-model
+          methodName: run
+          inputs:
+            repo: ${{ inputs.repo }}
+            path: ${{ inputs.path }}
