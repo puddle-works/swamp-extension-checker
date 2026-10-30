@@ -71,3 +71,55 @@ It holds one puddle: one extension with one bounded purpose.
   placeholders. Replace them; do not extend them.
 
 [adr]: https://github.com/puddle-works/puddleworks-apps/blob/main/docs/adr/ADR-004-one-repo-per-puddle.md
+
+<!-- BEGIN puddleworks-factory app section -->
+# swamp-extension-checker
+
+Deterministic check: Does this repository have a LICENSE file?. Built by puddleworks-factory from the app spec `swamp-extension-checker`;
+the specification below was agreed before it was handed over.
+
+Spec: [where it was agreed](http://127.0.0.1:3002/requests/afb8c437-bf4f-4fad-be6b-5204a34921e3), version 1, hash `6e074ac7eedb53b0c5c3051df877f27aba0134075243a04560c2a9624429eb73`.
+
+## Bounded purpose
+
+Say whether a git repository has a licence file at its root, which file it is, and the licence's SPDX name when GitHub reports one.
+
+## Inputs (the run form)
+
+- `repo` (string, empty) — A GitHub repository as owner/name or a github.com URL. Empty means check path instead.
+- `path` (string, `"."`) — A local directory; the git repository it is in is checked at its working-tree root. Used when repo is empty.
+
+## Settings (set once per model instance)
+
+None.
+
+## Output
+
+One record: whether the repository has a licence file at its root, the file's path (or none), the licence's SPDX name when GitHub reports one, and where it was checked (the local working tree or the GitHub default branch). Outside a git repository it says so instead.
+
+## Out of scope
+
+- Judging whether the licence is suitable, valid or compatible with dependencies
+- Licence files below the root, licence headers in source files and package-manifest licence fields
+- Adding or changing a licence file
+- The old Jev router registry (spikes/branch-protection-api/api/registry.ts in puddle-works/swamp-for-everything): puddlerouter's recipes now play that role
+
+Anything on this list, or anything beyond the purpose above, needs a new
+spec. Do not add it here, and do not add permissions or secrets the
+settings above do not name.
+
+## Finishing the draft
+
+1. Replace the `run` stub in `extensions/models/swamp_extension_checker.ts` with the
+   real behaviour. Keep the argument names: the workflow and the run form
+   depend on them.
+2. Give `ResultSchema.items` the shape of the output above, and add tests for
+   the behaviour to `extensions/models/swamp_extension_checker_test.ts`. Leave the
+   generated tests as they are: they stub `run`, so they keep passing. Tests
+   of the behaviour call `run` directly with working settings.
+3. If the tests need permissions (`--allow-read`, `--allow-net`, …), add the
+   same flags to the "Test it" command in `README.md`, to the `test` target
+   in the `Makefile`, and to the test commands in
+   `.github/workflows/ci.yml` if the repo has one.
+4. `deno check` and `deno test` must pass before review.
+<!-- END puddleworks-factory app section -->

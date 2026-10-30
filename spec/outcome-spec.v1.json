@@ -1,0 +1,108 @@
+{
+  "format": "puddleworks.dev/outcome-spec/v1",
+  "request": {
+    "id": "afb8c437-bf4f-4fad-be6b-5204a34921e3",
+    "title": "Deterministic check: Does this repository have a LICENSE file?",
+    "initialDescription": "Callers ask Jev (TypeSafe's System One model) this question through the Jev router, and Jev thinks it could be answered exactly by code. Build a deterministic swamp check for it and add it to the router's registry (spikes/branch-protection-api/api/registry.ts in puddle-works/swamp-for-everything).\n\nQuestion type: noul\nInstructions: Does this repository have a LICENSE file?\nCriteria: null\n\nExample state:\nThe repository https://github.com/puddle-works/swamp-for-everything is a place to test different ways of using Swamp. Its README has a short table listing each spike and what it tests.",
+    "currentProcess": "Answered by Jev (an LLM) via the Jev router. Jev rated it 0.82 likely to be answerable by code.",
+    "url": "http://127.0.0.1:3002/requests/afb8c437-bf4f-4fad-be6b-5204a34921e3"
+  },
+  "specification": {
+    "version": 1,
+    "problemStatement": "People ask \"Does this repository have a LICENSE file?\" and today an LLM (Jev) answers it, although Jev itself rated it 0.82 likely to be answerable exactly by code. The answer is a fact about the repository, so it should come from a deterministic check, not a model.",
+    "desiredOutcome": "A recipe in @puddleworks/recipes answers \"Does this repository have a LICENSE file?\" without calling the model. For the git repository of the current directory (or a GitHub repository named in the question), it says yes or no, gives the path of the licence file it found (LICENSE, LICENSE.md, LICENSE.txt, COPYING and the like, at the repository root) and, when GitHub recognises it, the licence's name (for example MIT).",
+    "scope": {
+      "in": [
+        "The exact phrase \"Does this repository have a LICENSE file?\" and close variants (\"does this repo have a licence?\", \"is there a LICENSE file?\")",
+        "The same question naming a GitHub repository (owner/name or a github.com URL)",
+        "Without a named repository: the git repository the current directory is in, checked in its working tree at the root",
+        "With a named GitHub repository: its default branch on GitHub, via @webframp/github",
+        "Licence files at the repository root whose name, ignoring case, is LICENSE, LICENCE or COPYING, with or without an extension (.md, .txt, .rst)",
+        "The licence's SPDX name when GitHub reports one",
+        "The recipe in @puddleworks/recipes, with its examples, piece and whenEmpty answer, and a test for each acceptance criterion"
+      ],
+      "out": [
+        "Judging whether the licence is suitable, valid or compatible with dependencies",
+        "Licence files below the root, licence headers in source files and package-manifest licence fields",
+        "Adding or changing a licence file",
+        "The old Jev router registry (spikes/branch-protection-api/api/registry.ts in puddle-works/swamp-for-everything): puddlerouter's recipes now play that role"
+      ]
+    },
+    "constraints": [
+      "Answered without calling any model",
+      "Read-only: nothing is written to the repository or to GitHub",
+      "Reads through @swamp/git and @webframp/github where they have the method; anything they lack is added as a small method, not a shell wrapper"
+    ],
+    "assumptions": [
+      "\"This repository\" means the git repository of the directory the question is asked from",
+      "puddlerouter with @puddleworks/recipes has replaced the Jev router's registry as the home for deterministic checks, so the check is built as a recipe rather than a registry.ts entry",
+      "For a named repository, gh is signed in, as @webframp/github needs"
+    ],
+    "acceptanceCriteria": [
+      {
+        "id": "AC1",
+        "text": "Asked \"Does this repository have a LICENSE file?\" in a git repository with LICENSE at its root, the answer is yes and names LICENSE"
+      },
+      {
+        "id": "AC2",
+        "text": "In a git repository with no licence file at its root, the answer is no"
+      },
+      {
+        "id": "AC3",
+        "text": "A root file named LICENSE.md, licence.txt or COPYING counts as a licence file and is named in the answer"
+      },
+      {
+        "id": "AC4",
+        "text": "Asked about puddle-works/swamp-for-everything by name, the answer comes from GitHub and gives the licence's SPDX name when GitHub reports one"
+      },
+      {
+        "id": "AC5",
+        "text": "Asked outside any git repository with no repository named, the answer says the current directory is not in a git repository, and calls no model"
+      },
+      {
+        "id": "AC6",
+        "text": "The recipe answers without calling the model and changes nothing"
+      }
+    ],
+    "recipe": {
+      "examples": [
+        {
+          "phrase": "Does this repository have a LICENSE file?",
+          "answer": "Yes: LICENSE (MIT)."
+        },
+        {
+          "phrase": "does puddle-works/swamp-for-everything have a licence?",
+          "answer": "Yes or no for that repository's default branch on GitHub, with the file's path and the licence's SPDX name when GitHub reports one."
+        }
+      ],
+      "pieces": [
+        {
+          "name": "repo",
+          "shape": "repo"
+        }
+      ],
+      "whenEmpty": "With no repository named, check the git repository of the current directory; outside a git repository, say so and ask nothing.",
+      "candidateExtensions": [
+        "@swamp/git",
+        "@webframp/github"
+      ]
+    }
+  },
+  "agreement": {
+    "agreedBy": {
+      "name": "the user",
+      "email": ""
+    },
+    "agreedAt": "2026-10-29T23:31:55.371Z",
+    "specHash": "6e074ac7eedb53b0c5c3051df877f27aba0134075243a04560c2a9624429eb73"
+  },
+  "participants": [
+    {
+      "role": "outcome_owner",
+      "name": "the user",
+      "email": ""
+    }
+  ],
+  "openQuestions": [],
+  "exportedAt": "2026-10-29T23:31:55.371Z"
+}
