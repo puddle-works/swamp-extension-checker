@@ -20,16 +20,18 @@
 import { z } from "npm:zod@4";
 
 /** Settings fixed once per model instance by the builder, not the person running it. */
-export const GlobalArgsSchema = z.object({
-
-});
+export const GlobalArgsSchema = z.object({});
 /** The settings, as the run method receives them. */
 export type GlobalArgs = z.infer<typeof GlobalArgsSchema>;
 
 /** Arguments for `run` — one per specification input. */
 export const RunArgsSchema = z.object({
-  repo: z.string().default("").describe("A GitHub repository as owner/name or a github.com URL. Empty means check path instead."),
-  path: z.string().default(".").describe("A local directory; the git repository it is in is checked at its working-tree root. Used when repo is empty."),
+  repo: z.string().default("").describe(
+    "A GitHub repository as owner/name or a github.com URL. Empty means check path instead.",
+  ),
+  path: z.string().default(".").describe(
+    "A local directory; the git repository it is in is checked at its working-tree root. Used when repo is empty.",
+  ),
 });
 /** The inputs of one run. */
 export type RunArgs = z.infer<typeof RunArgsSchema>;
@@ -37,11 +39,21 @@ export type RunArgs = z.infer<typeof RunArgsSchema>;
 /** What one check found. */
 export const LicenceSchema = z.object({
   found: z.boolean().describe("Whether there is a licence file at the root."),
-  inGitRepository: z.boolean().describe("False when the local path is not in a git repository."),
-  file: z.string().nullable().describe("The licence file's name at the root, or null."),
-  spdx: z.string().nullable().describe("The licence's SPDX id when GitHub reports one for this file."),
-  checked: z.enum(["local", "github"]).describe("The local working tree, or the GitHub default branch."),
-  repository: z.string().describe("The local repository's root, or owner/name on GitHub."),
+  inGitRepository: z.boolean().describe(
+    "False when the local path is not in a git repository.",
+  ),
+  file: z.string().nullable().describe(
+    "The licence file's name at the root, or null.",
+  ),
+  spdx: z.string().nullable().describe(
+    "The licence's SPDX id when GitHub reports one for this file.",
+  ),
+  checked: z.enum(["local", "github"]).describe(
+    "The local working tree, or the GitHub default branch.",
+  ),
+  repository: z.string().describe(
+    "The local repository's root, or owner/name on GitHub.",
+  ),
   answer: z.string().describe("The answer as one sentence."),
 });
 /** What one check found. */
@@ -73,10 +85,16 @@ export const io = {
     }).output();
     const text = new TextDecoder().decode(out.stdout);
     if (out.success) return JSON.parse(text);
-    if (/"status":\s*"404"|HTTP 404/.test(text + new TextDecoder().decode(out.stderr))) {
+    if (
+      /"status":\s*"404"|HTTP 404/.test(
+        text + new TextDecoder().decode(out.stderr),
+      )
+    ) {
       return null;
     }
-    throw new Error(`gh api ${path} failed: ${new TextDecoder().decode(out.stderr).trim()}`);
+    throw new Error(
+      `gh api ${path} failed: ${new TextDecoder().decode(out.stderr).trim()}`,
+    );
   },
   async originUrl(root: string): Promise<string | null> {
     const out = await new Deno.Command("git", {
@@ -109,7 +127,9 @@ function pickFile(names: string[], preferred: string | null): string | null {
 }
 
 /** GitHub's licence for owner/name: its path and SPDX id (null for NOASSERTION or none). */
-async function githubLicence(repo: string): Promise<{ path: string; spdx: string | null } | null> {
+async function githubLicence(
+  repo: string,
+): Promise<{ path: string; spdx: string | null } | null> {
   const body = await io.github(`repos/${repo}/license`) as
     | { path?: string; license?: { spdx_id?: string | null } }
     | null;
@@ -152,7 +172,9 @@ async function checkGithub(repo: string): Promise<Licence> {
   const names = (listing as Array<{ name?: string; type?: string }>)
     .filter((e) => e.type === "file" && typeof e.name === "string")
     .map((e) => e.name as string);
-  const licence = names.some((n) => LICENCE_FILE.test(n)) ? await githubLicence(repo) : null;
+  const licence = names.some((n) => LICENCE_FILE.test(n))
+    ? await githubLicence(repo)
+    : null;
   const file = pickFile(names, licence?.path ?? null);
   const spdx = file && licence?.path === file ? licence.spdx : null;
   return {
@@ -171,7 +193,9 @@ async function checkLocal(path: string): Promise<Licence> {
   try {
     dir = await Deno.realPath(path);
   } catch (e) {
-    if (e instanceof Deno.errors.NotFound) throw new Error(`${path} does not exist`);
+    if (e instanceof Deno.errors.NotFound) {
+      throw new Error(`${path} does not exist`);
+    }
     throw e;
   }
   const root = await gitRoot(dir);
@@ -221,11 +245,16 @@ async function checkLocal(path: string): Promise<Licence> {
  * With `repo` set, its default branch is checked on GitHub; otherwise the git
  * repository `path` is in is checked at its working-tree root. Reads only.
  */
-export async function run(args: RunArgs, _settings: GlobalArgs): Promise<Licence[]> {
+export async function run(
+  args: RunArgs,
+  _settings: GlobalArgs,
+): Promise<Licence[]> {
   if (args.repo.trim() !== "") {
     const repo = ownerName(args.repo);
     if (!repo) {
-      throw new Error(`repo must be owner/name or a github.com URL, not "${args.repo}"`);
+      throw new Error(
+        `repo must be owner/name or a github.com URL, not "${args.repo}"`,
+      );
     }
     return [await checkGithub(repo)];
   }
@@ -251,7 +280,8 @@ export const model = {
   globalArguments: GlobalArgsSchema,
   resources: {
     result: {
-      description: "One record: whether the repository has a licence file at its root, the file's path (or none), the licence's SPDX name when GitHub reports one, and where it was checked (the local working tree or the GitHub default branch). Outside a git repository it says so instead.",
+      description:
+        "One record: whether the repository has a licence file at its root, the file's path (or none), the licence's SPDX name when GitHub reports one, and where it was checked (the local working tree or the GitHub default branch). Outside a git repository it says so instead.",
       schema: ResultSchema,
       lifetime: "infinite" as const,
       garbageCollection: 20,
@@ -259,7 +289,8 @@ export const model = {
   },
   methods: {
     run: {
-      description: "Say whether a git repository has a licence file at its root, which file it is, and the licence's SPDX name when GitHub reports one.",
+      description:
+        "Say whether a git repository has a licence file at its root, which file it is, and the licence's SPDX name when GitHub reports one.",
       arguments: RunArgsSchema,
       execute: async (args: RunArgs, context: MethodContext) => {
         const items = await behaviour.run(args, context.globalArgs);
