@@ -35,7 +35,17 @@ Run it:
 
 ```bash
 swamp workflow run @puddleworks/swamp-extension-checker
+swamp workflow run @puddleworks/swamp-extension-checker --input repo=owner/name
 ```
+
+A local check needs `git` on the `PATH`. A GitHub check, and the SPDX name for a
+local repository whose origin is on GitHub, needs `gh` signed in.
+
+The package is also a recipe pack for `@puddleworks/recipes`: the workflow
+`@puddleworks/swamp-extension-checker-licence-recipe` answers "does owner/name
+have a licence?" from the router. It covers only a named GitHub repository,
+because the router runs recipes in its own repo rather than the one the question
+was asked from.
 
 Test it:
 
