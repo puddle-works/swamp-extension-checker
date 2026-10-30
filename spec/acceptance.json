@@ -7,7 +7,7 @@
         "a path inside the repository is checked at the repository's root",
         "a local repository whose origin is on GitHub gets the SPDX name when GitHub's file is the same"
       ],
-      "manual": "Ran `swamp workflow run @puddleworks/swamp-extension-checker` (path defaults to .) in this repo, which has LICENSE at its root: the step logged \"Yes: LICENSE (MIT).\" and succeeded."
+      "manual": "Ran `swamp workflow run @puddleworks/swamp-extension-checker` (path defaults to .) in this repo, which has LICENSE at its root: it logged \"Checking . on local\" then \"Yes: LICENSE (MIT).\" and succeeded."
     },
     {
       "id": "AC2",
@@ -22,10 +22,9 @@
       "id": "AC3",
       "tests": [
         "AC3: LICENSE.md, licence.txt and COPYING count and are named",
-        "a worktree, whose .git is a file, is a git repository",
-        "AC4: GitHub's NOASSERTION is no SPDX name, and a licence directory does not count"
+        "a worktree, whose .git is a file, is a git repository"
       ],
-      "manual": "Ran `swamp workflow run @puddleworks/swamp-extension-checker-licence-recipe --input repo=denoland/deno`: the result item was found=true, file=LICENSE.md, spdx=MIT, answer \"Yes: LICENSE.md (MIT).\""
+      "manual": "Ran `swamp workflow run @puddleworks/swamp-extension-checker --input repo=https://github.com/denoland/deno`: it logged \"Checking denoland/deno on github\" then \"Yes: LICENSE.md (MIT).\""
     },
     {
       "id": "AC4",
@@ -33,28 +32,26 @@
         "AC4: puddle-works/swamp-for-everything, named, is answered from GitHub",
         "AC4: a named GitHub repository with a licence gets GitHub's SPDX name",
         "AC4: a github.com URL names the same repository",
-        "AC4: GitHub's NOASSERTION is no SPDX name, and a licence directory does not count",
-        "io.github reads a path with gh api and parses the JSON",
-        "io.github is null when GitHub answers 404"
+        "AC4: GitHub's NOASSERTION is no SPDX name, and a licence directory does not count"
       ],
-      "manual": "The tests fake gh, so I ran the workflow with the real gh signed in. `--input repo=puddle-works/swamp-for-everything` logged \"Checking puddle-works/swamp-for-everything on github\" then \"No: there is no licence file at the root.\" (its root has no licence file, so GitHub reports no SPDX name). The recipe workflow with repo=denoland/deno gave checked=github, file=LICENSE.md, spdx=MIT."
+      "manual": "The tests fake gh, so I ran it with the real gh signed in. `--input repo=puddle-works/swamp-for-everything` on the form workflow, and the recipe workflow with the same repo, each logged \"Checking puddle-works/swamp-for-everything on github\" then \"No: there is no licence file at the root.\" (its root has no licence file). `--input repo=https://github.com/denoland/deno` gave \"Yes: LICENSE.md (MIT).\", so the SPDX name comes through from GitHub. A repository that does not exist failed with \"GitHub has no repository acme-nonexistent-zz/nothing-here-zz that gh can see\", so real gh 404s are read correctly."
     },
     {
       "id": "AC5",
       "tests": [
         "AC5: outside any git repository it says so and asks GitHub nothing"
       ],
-      "manual": "Ran the form workflow with path set to a new empty scratch directory outside any git repository: it succeeded and logged \"<dir> is not in a git repository.\". The source has no fetch, model or LLM call anywhere."
+      "manual": "Ran the form workflow with path set to a new empty scratch directory outside any git repository: it succeeded and logged \"<dir> is not in a git repository.\" The source has no fetch, model or LLM call anywhere."
     },
     {
       "id": "AC6",
       "tests": [
         "AC6: a local check changes nothing in the repository",
         "AC6: the recipe calls this extension's run method and reads its result",
-        "the recipe workflow has the one step @puddleworks/recipes can run",
-        "io.github reads a path with gh api and parses the JSON"
+        "io.github reads a path with gh api and parses the JSON",
+        "io.originUrl gives the origin URL, or null when there is none"
       ],
-      "manual": "After six live workflow runs (local, named repo, recipe, non-git dir, file path), `git status --short` in the repo was identical to before. The only GitHub calls are `gh api` GETs (no -X/--method), and the source writes no files. Whether puddlerouter skips the model for a matched recipe is router behaviour and is not tested here."
+      "manual": "After seven live workflow runs (local, two named repos, a missing repo, a non-git dir, and the recipe), `git status --short` in the repo was identical to before. The only outside calls are `gh api` GETs (no -X/--method) and `git remote get-url origin`, and the source writes no files. Whether puddlerouter skips the model for a matched recipe is router behaviour and is not tested here."
     }
   ]
 }

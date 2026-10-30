@@ -1,0 +1,82 @@
+{
+  "extension": "@puddleworks/swamp-extension-checker",
+  "version": "2026.10.30.1",
+  "reviewedAt": "2026-10-30T15:14:04Z",
+  "dimensions": [
+    {
+      "id": "credentials-secrets",
+      "verdict": "pass",
+      "note": "No settings, no secrets, no vault fields. GitHub reads use the environment's gh sign-in (the spec assumes gh is signed in); nothing is stored or logged from it."
+    },
+    {
+      "id": "logging-quality",
+      "verdict": "pass",
+      "note": "run logs info on entry (\"Checking {repository} on {where}\") and on completion (\"{answer}\") with structured props; a failed SPDX lookup or missing git is a warning with {repository} and {error}. No tokens or secret values are logged. Tested by \"run logs what it checks and what it found\" and the two warning tests."
+    },
+    {
+      "id": "error-handling",
+      "verdict": "pass",
+      "note": "behaviour.run finishes before writeResource, so a failure writes nothing. gh failures other than 404 throw with gh's stderr; a missing repo throws \"GitHub has no repository X that gh can see\" (confirmed live); bad repo and missing path throw with the value. The optional SPDX lookup for a local repo is caught narrowly and logged. Minor: a JSON.parse failure or gh missing from PATH on a named check surfaces Deno's raw error without the repo in it."
+    },
+    {
+      "id": "testing-completeness",
+      "verdict": "pass",
+      "note": "38 tests pass under make test. io.github/io.originUrl are stubbed for behaviour tests and Deno.Command is faked to test the gh/git wrappers themselves (success, 404, other failure, no origin). Covers yes/no, every licence name form, sub-root and directory non-matches, worktree .git file, empty repo, missing repo, bad input, non-git dir, missing path, workflows and recipe tag. Uses a hand-built context rather than createModelTestContext, which is acceptable for a single writeResource. Untested: ssh:// and git@ forms of the repo argument, and the non-array listing branch."
+    },
+    {
+      "id": "idempotency-resilience",
+      "verdict": "pass",
+      "note": "Read-only: no create or delete. Each run writes a new version of the one result resource; interruption leaves nothing partial. Live runs left git status unchanged."
+    },
+    {
+      "id": "api-contracts",
+      "verdict": "pass",
+      "note": "GETs only via gh api with the GitHub JSON Accept header: repos/{o}/{n}/contents/ (default branch), repos/{o}/{n}/license and repos/{o}/{n} to tell an empty repo from a missing one. Responses are shape-checked (Array.isArray, typeof name, body?.path) before use; NOASSERTION is treated as no SPDX name. The root contents endpoint is not paginated (GitHub caps a directory listing at 1000 entries, which no real root nears). Rate limits are not retried, acceptable for a one-shot read; the error carries gh's message."
+    },
+    {
+      "id": "resource-management",
+      "verdict": "pass",
+      "note": "Deno.Command(...).output() collects and closes both pipes; readDir iterators run to completion; no temp files or cloud resources are created. Tests remove their temp dirs in finally."
+    },
+    {
+      "id": "published-surface-hygiene",
+      "verdict": "pass",
+      "note": "Package files are the model, two workflows, README.md and LICENSE (MIT, puddle-works). No IPs, internal hostnames, account IDs or personal details in them; fixtures use acme/tool and the public repo the spec names. The 127.0.0.1 request URLs live only in spec/ (not packaged) and are loopback; the spec redaction is deliberate."
+    },
+    {
+      "id": "schema-strictness",
+      "verdict": "pass",
+      "note": "GlobalArgsSchema, RunArgsSchema, LicenceSchema and ResultSchema are plain z.object with no passthrough; checked enum and nullable fields are explicit. Mechanical checks: the one writeResource(\"result\", \"result\", {args, items, ranAt}) matches ResultSchema field for field, every Licence return sets all seven fields with real values, no placeholders, no truncation."
+    },
+    {
+      "id": "lifetime-gc",
+      "verdict": "pass",
+      "note": "The result resource sets lifetime infinite and garbageCollection 20, reasonable for a small check history."
+    },
+    {
+      "id": "crud-completeness",
+      "verdict": "na",
+      "note": "A read-only check with one run method, not a CRUD lifecycle model."
+    },
+    {
+      "id": "preflight-checks",
+      "verdict": "na",
+      "note": "No mutating method; run only reads the working tree and GitHub."
+    },
+    {
+      "id": "instance-names",
+      "verdict": "pass",
+      "note": "One spec, one method, one fixed instance name \"result\"; no collisions."
+    },
+    {
+      "id": "data-access",
+      "verdict": "na",
+      "note": "No method reads stored state back."
+    },
+    {
+      "id": "version-upgrades",
+      "verdict": "na",
+      "note": "Initial version: git history shows the model version was only the template placeholder 2026.10.26.1 before this build set 2026.10.30.1 to match the manifest, so no earlier model shape exists to upgrade from."
+    }
+  ]
+}
