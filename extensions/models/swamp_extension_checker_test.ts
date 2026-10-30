@@ -205,28 +205,47 @@ Deno.test("a local licence file GitHub does not report has no SPDX name", async 
   });
 });
 
-Deno.test("AC4: a named GitHub repository is checked on GitHub, with its SPDX name", async () => {
+Deno.test("AC4: puddle-works/swamp-for-everything, named, is answered from GitHub", async () => {
+  // Its real root on 2026-10-30, which has no licence file.
   using fake = fakeIo({
-    "repos/puddle-works/swamp-extension-checker/contents/": [
+    "repos/puddle-works/swamp-for-everything": { full_name: "puddle-works/swamp-for-everything" },
+    "repos/puddle-works/swamp-for-everything/contents/": [
+      { name: ".gitignore", type: "file" },
+      { name: "README.md", type: "file" },
+      { name: "docs", type: "dir" },
+      { name: "mod-blog.md", type: "file" },
+      { name: "spikes", type: "dir" },
+    ],
+  });
+  const r = await check({ repo: "puddle-works/swamp-for-everything" });
+  assertEquals(r, {
+    found: false,
+    inGitRepository: true,
+    file: null,
+    spdx: null,
+    checked: "github",
+    repository: "puddle-works/swamp-for-everything",
+    answer: "No: there is no licence file at the root.",
+  });
+  assert(fake.calls.every((c) => c.startsWith("repos/puddle-works/swamp-for-everything")));
+});
+
+Deno.test("AC4: a named GitHub repository with a licence gets GitHub's SPDX name", async () => {
+  using _io = fakeIo({
+    "repos/acme/tool/contents/": [
       { name: "LICENSE", type: "file" },
       { name: "README.md", type: "file" },
     ],
-    "repos/puddle-works/swamp-extension-checker/license": {
-      path: "LICENSE",
-      license: { spdx_id: "MIT" },
-    },
+    "repos/acme/tool/license": { path: "LICENSE", license: { spdx_id: "MIT" } },
   });
-  const r = await check({ repo: "puddle-works/swamp-extension-checker" });
-  assertEquals(r, {
-    found: true,
-    inGitRepository: true,
-    file: "LICENSE",
-    spdx: "MIT",
-    checked: "github",
-    repository: "puddle-works/swamp-extension-checker",
-    answer: "Yes: LICENSE (MIT).",
-  });
-  assert(fake.calls.every((c) => c.startsWith("repos/puddle-works/swamp-extension-checker/")));
+  const r = await check({ repo: "acme/tool" });
+  assertEquals([r.found, r.file, r.spdx, r.checked, r.answer], [
+    true,
+    "LICENSE",
+    "MIT",
+    "github",
+    "Yes: LICENSE (MIT).",
+  ]);
 });
 
 Deno.test("AC4: a github.com URL names the same repository", async () => {
@@ -252,9 +271,15 @@ Deno.test("AC4: GitHub's NOASSERTION is no SPDX name, and a licence directory do
   assertEquals([r.file, r.spdx, r.answer], ["COPYING.txt", null, "Yes: COPYING.txt."]);
 });
 
-Deno.test("AC4: a repository GitHub cannot show is an error, not a no", async () => {
+Deno.test("AC4: a repository GitHub cannot find is an error, not a no", async () => {
   using _io = fakeIo({});
   await assertRejects(() => check({ repo: "acme/missing" }), Error, "acme/missing");
+});
+
+Deno.test("AC4: an empty GitHub repository, whose root GitHub answers 404 for, is a no", async () => {
+  using _io = fakeIo({ "repos/acme/empty": { full_name: "acme/empty" } });
+  const r = await check({ repo: "acme/empty" });
+  assertEquals([r.found, r.file, r.answer], [false, null, "No: there is no licence file at the root."]);
 });
 
 Deno.test("a repo that is neither owner/name nor a github.com URL is refused", async () => {
@@ -379,4 +404,111 @@ Deno.test("the manifest labels it a read-only recipe pack", async () => {
   const url = new URL("../../manifest.yaml", import.meta.url);
   const m = parseYaml(await Deno.readTextFile(url)) as { labels?: string[] };
   assertEquals([...(m.labels ?? [])].sort(), ["effects-read", "puddlerouter-recipe"]);
+});
+
+// ---- The outside reads ----
+
+/** Stand in for Deno.Command: each call gets the result `answer` gives for its command and args. */
+function fakeCommand(
+  answer: (cmd: string, args: string[]) => { code: number; stdout?: string; stderr?: string },
+) {
+  const calls: Array<{ cmd: string; args: string[] }> = [];
+  const enc = new TextEncoder();
+  class FakeCommand {
+    constructor(readonly cmd: string, readonly opts: { args: string[] }) {
+      calls.push({ cmd, args: opts.args });
+    }
+    output() {
+      const r = answer(this.cmd, this.opts.args);
+      return Promise.resolve({
+        success: r.code === 0,
+        code: r.code,
+        stdout: enc.encode(r.stdout ?? ""),
+        stderr: enc.encode(r.stderr ?? ""),
+      });
+    }
+  }
+  const real = Deno.Command;
+  const deno = Deno as unknown as { Command: unknown };
+  deno.Command = FakeCommand;
+  return { calls, [Symbol.dispose]: () => (deno.Command = real) };
+}
+
+Deno.test("io.github reads a path with gh api and parses the JSON", async () => {
+  using cmd = fakeCommand(() => ({ code: 0, stdout: '{"path":"LICENSE"}' }));
+  assertEquals(await io.github("repos/acme/tool/license"), { path: "LICENSE" });
+  assertEquals(cmd.calls, [{
+    cmd: "gh",
+    args: ["api", "-H", "Accept: application/vnd.github+json", "repos/acme/tool/license"],
+  }]);
+});
+
+Deno.test("io.github is null when GitHub answers 404", async () => {
+  using _cmd = fakeCommand(() => ({
+    code: 1,
+    stdout: '{"message":"Not Found","status":"404"}',
+    stderr: "gh: Not Found (HTTP 404)",
+  }));
+  assertEquals(await io.github("repos/acme/missing"), null);
+});
+
+Deno.test("io.github throws on any other failure, with gh's message", async () => {
+  using _cmd = fakeCommand(() => ({ code: 4, stderr: "To get started with GitHub CLI, please run:  gh auth login" }));
+  await assertRejects(() => io.github("repos/acme/tool"), Error, "gh auth login");
+});
+
+Deno.test("io.originUrl gives the origin URL, or null when there is none", async () => {
+  {
+    using cmd = fakeCommand(() => ({ code: 0, stdout: "git@github.com:acme/tool.git\n" }));
+    assertEquals(await io.originUrl("/r"), "git@github.com:acme/tool.git");
+    assertEquals(cmd.calls, [{ cmd: "git", args: ["-C", "/r", "remote", "get-url", "origin"] }]);
+  }
+  using _cmd = fakeCommand(() => ({ code: 2, stderr: "error: No such remote 'origin'" }));
+  assertEquals(await io.originUrl("/r"), null);
+});
+
+// ---- Logging ----
+
+interface Logged {
+  level: string;
+  message: string;
+  props: Record<string, unknown>;
+}
+
+/** A logger that keeps what it is given. */
+function recordingLogger() {
+  const lines: Logged[] = [];
+  const at = (level: string) => (message: string, props: Record<string, unknown> = {}) => {
+    lines.push({ level, message, props });
+  };
+  return { lines, logger: { info: at("info"), warning: at("warning") } };
+}
+
+Deno.test("run logs what it checks and what it found", async () => {
+  using _io = fakeIo({
+    "repos/acme/tool/contents/": [{ name: "LICENSE", type: "file" }],
+    "repos/acme/tool/license": { path: "LICENSE", license: { spdx_id: "MIT" } },
+  });
+  const { lines, logger } = recordingLogger();
+  await model.methods.run.execute(RunArgsSchema.parse({ repo: "acme/tool" }), {
+    globalArgs: SETTINGS,
+    logger,
+    writeResource: (_s, name) => Promise.resolve({ name }),
+  });
+  assertEquals(lines.map((l) => l.level), ["info", "info"]);
+  assertEquals(lines[0].props, { where: "github", repository: "acme/tool" });
+  assertEquals(lines[1].props, { answer: "Yes: LICENSE (MIT)." });
+});
+
+Deno.test("a failed SPDX lookup for a local repository is logged as a warning, and the answer stands", async () => {
+  await withRepo(["LICENSE"], async (dir) => {
+    using _or = stub(io, "originUrl", () => Promise.resolve("https://github.com/acme/tool"));
+    using _gh = stub(io, "github", () => Promise.reject(new Error("gh api failed: offline")));
+    const { lines, logger } = recordingLogger();
+    const items = await run(RunArgsSchema.parse({ path: dir }), SETTINGS, logger);
+    assertEquals(items[0].answer, "Yes: LICENSE.");
+    const warn = lines.filter((l) => l.level === "warning");
+    assertEquals(warn.length, 1);
+    assertEquals(warn[0].props, { repository: "acme/tool", error: "gh api failed: offline" });
+  });
 });
