@@ -512,3 +512,15 @@ Deno.test("a failed SPDX lookup for a local repository is logged as a warning, a
     assertEquals(warn[0].props, { repository: "acme/tool", error: "gh api failed: offline" });
   });
 });
+
+Deno.test("without git on the PATH, a local check still answers from the files, and says why there is no SPDX name", async () => {
+  await withRepo(["LICENSE"], async (dir) => {
+    using _or = stub(io, "originUrl", () => Promise.reject(new Deno.errors.NotFound("git not found")));
+    const { lines, logger } = recordingLogger();
+    const items = await run(RunArgsSchema.parse({ path: dir }), SETTINGS, logger);
+    assertEquals(items[0].answer, "Yes: LICENSE.");
+    const warn = lines.filter((l) => l.level === "warning");
+    assertEquals(warn.length, 1);
+    assertEquals(warn[0].props, { repository: items[0].repository, error: "git not found" });
+  });
+});

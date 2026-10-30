@@ -77,6 +77,9 @@ export type Result = z.infer<typeof ResultSchema>;
  */
 export const io = {
   async github(path: string): Promise<unknown> {
+    // `path` is built from an owner/name that matched OWNER_NAME, and the
+    // arguments go to gh as a list, never through a shell.
+    // swamp-quality-ignore deno-command
     const out = await new Deno.Command("gh", {
       args: ["api", "-H", "Accept: application/vnd.github+json", path],
       stdout: "piped",
@@ -96,6 +99,8 @@ export const io = {
     );
   },
   async originUrl(root: string): Promise<string | null> {
+    // `root` is a real directory found by gitRoot; no shell is involved.
+    // swamp-quality-ignore deno-command
     const out = await new Deno.Command("git", {
       args: ["-C", root, "remote", "get-url", "origin"],
       stdout: "piped",
@@ -231,14 +236,22 @@ async function checkLocal(path: string, log: Logger): Promise<Licence> {
   const file = pickFile(names, null);
   let spdx: string | null = null;
   if (file) {
-    const origin = await io.originUrl(root);
-    const repo = origin && GITHUB_URL.test(origin) ? ownerName(origin) : null;
+    // The SPDX name is extra: the local answer stands without it.
+    let repo: string | null = null;
+    try {
+      const origin = await io.originUrl(root);
+      repo = origin && GITHUB_URL.test(origin) ? ownerName(origin) : null;
+    } catch (e) {
+      log.warning("No SPDX name from GitHub for {repository}: {error}", {
+        repository: root,
+        error: (e as Error).message,
+      });
+    }
     if (repo) {
       try {
         const licence = await githubLicence(repo);
         if (licence?.path === file) spdx = licence.spdx;
       } catch (e) {
-        // The SPDX name is extra: the local answer stands without it.
         log.warning("No SPDX name from GitHub for {repository}: {error}", {
           repository: repo,
           error: (e as Error).message,
