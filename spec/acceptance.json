@@ -1,0 +1,60 @@
+{
+  "criteria": [
+    {
+      "id": "AC1",
+      "tests": [
+        "AC1: a LICENSE at the root of the local repository is a yes that names it",
+        "a path inside the repository is checked at the repository's root",
+        "a local repository whose origin is on GitHub gets the SPDX name when GitHub's file is the same"
+      ],
+      "manual": "Ran `swamp workflow run @puddleworks/swamp-extension-checker` (path defaults to .) in this repo, which has LICENSE at its root: the step logged \"Yes: LICENSE (MIT).\" and succeeded."
+    },
+    {
+      "id": "AC2",
+      "tests": [
+        "AC2: no licence file at the root of the local repository is a no",
+        "AC3: other extensions and licence files below the root do not count",
+        "AC3: a directory named LICENSE is not a licence file"
+      ],
+      "manual": ""
+    },
+    {
+      "id": "AC3",
+      "tests": [
+        "AC3: LICENSE.md, licence.txt and COPYING count and are named",
+        "a worktree, whose .git is a file, is a git repository",
+        "AC4: GitHub's NOASSERTION is no SPDX name, and a licence directory does not count"
+      ],
+      "manual": "Ran `swamp workflow run @puddleworks/swamp-extension-checker-licence-recipe --input repo=denoland/deno`: the result item was found=true, file=LICENSE.md, spdx=MIT, answer \"Yes: LICENSE.md (MIT).\""
+    },
+    {
+      "id": "AC4",
+      "tests": [
+        "AC4: puddle-works/swamp-for-everything, named, is answered from GitHub",
+        "AC4: a named GitHub repository with a licence gets GitHub's SPDX name",
+        "AC4: a github.com URL names the same repository",
+        "AC4: GitHub's NOASSERTION is no SPDX name, and a licence directory does not count",
+        "io.github reads a path with gh api and parses the JSON",
+        "io.github is null when GitHub answers 404"
+      ],
+      "manual": "The tests fake gh, so I ran the workflow with the real gh signed in. `--input repo=puddle-works/swamp-for-everything` logged \"Checking puddle-works/swamp-for-everything on github\" then \"No: there is no licence file at the root.\" (its root has no licence file, so GitHub reports no SPDX name). The recipe workflow with repo=denoland/deno gave checked=github, file=LICENSE.md, spdx=MIT."
+    },
+    {
+      "id": "AC5",
+      "tests": [
+        "AC5: outside any git repository it says so and asks GitHub nothing"
+      ],
+      "manual": "Ran the form workflow with path set to a new empty scratch directory outside any git repository: it succeeded and logged \"<dir> is not in a git repository.\". The source has no fetch, model or LLM call anywhere."
+    },
+    {
+      "id": "AC6",
+      "tests": [
+        "AC6: a local check changes nothing in the repository",
+        "AC6: the recipe calls this extension's run method and reads its result",
+        "the recipe workflow has the one step @puddleworks/recipes can run",
+        "io.github reads a path with gh api and parses the JSON"
+      ],
+      "manual": "After six live workflow runs (local, named repo, recipe, non-git dir, file path), `git status --short` in the repo was identical to before. The only GitHub calls are `gh api` GETs (no -X/--method), and the source writes no files. Whether puddlerouter skips the model for a matched recipe is router behaviour and is not tested here."
+    }
+  ]
+}
