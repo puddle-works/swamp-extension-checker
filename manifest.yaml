@@ -5,6 +5,9 @@ description: "Say whether a git repository has a licence file at its root, which
 repository: "https://github.com/puddle-works/swamp-extension-checker"
 license: MIT
 visibility: private
+labels:
+  - puddlerouter-recipe
+  - effects-read
 additionalFiles:
   - README.md
   - LICENSE
@@ -12,3 +15,4 @@ models:
   - swamp_extension_checker.ts
 workflows:
   - workflow-swamp-extension-checker.yaml
+  - workflow-swamp-extension-checker-licence-recipe.yaml

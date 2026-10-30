@@ -42,5 +42,5 @@ Test it:
 ```bash
 DENO=$(swamp doctor extensions --json | jq -r '.denoPath')
 $DENO check extensions/models/swamp_extension_checker.ts
-$DENO test extensions/models/swamp_extension_checker_test.ts
+$DENO test --allow-read --allow-write extensions/models/
 ```

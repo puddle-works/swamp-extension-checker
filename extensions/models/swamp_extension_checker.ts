@@ -34,24 +34,202 @@ export const RunArgsSchema = z.object({
 /** The inputs of one run. */
 export type RunArgs = z.infer<typeof RunArgsSchema>;
 
+/** What one check found. */
+export const LicenceSchema = z.object({
+  found: z.boolean().describe("Whether there is a licence file at the root."),
+  inGitRepository: z.boolean().describe("False when the local path is not in a git repository."),
+  file: z.string().nullable().describe("The licence file's name at the root, or null."),
+  spdx: z.string().nullable().describe("The licence's SPDX id when GitHub reports one for this file."),
+  checked: z.enum(["local", "github"]).describe("The local working tree, or the GitHub default branch."),
+  repository: z.string().describe("The local repository's root, or owner/name on GitHub."),
+  answer: z.string().describe("The answer as one sentence."),
+});
+/** What one check found. */
+export type Licence = z.infer<typeof LicenceSchema>;
+
 /**
  * One run's result. One record: whether the repository has a licence file at its root, the file's path (or none), the licence's SPDX name when GitHub reports one, and where it was checked (the local working tree or the GitHub default branch). Outside a git repository it says so instead.
  */
 export const ResultSchema = z.object({
   args: RunArgsSchema,
-  items: z.array(z.unknown()),
+  items: z.array(LicenceSchema),
   ranAt: z.iso.datetime(),
 });
 /** One run's result, as written to the result resource. */
 export type Result = z.infer<typeof ResultSchema>;
 
 /**
+ * The two outside reads, swapped out by the tests. Both only read.
+ * `github` returns the parsed JSON of a GitHub REST API path, or null when
+ * GitHub answers 404; `originUrl` returns the local repository's `origin`
+ * URL, or null when it has none.
+ */
+export const io = {
+  async github(path: string): Promise<unknown> {
+    const out = await new Deno.Command("gh", {
+      args: ["api", "-H", "Accept: application/vnd.github+json", path],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    const text = new TextDecoder().decode(out.stdout);
+    if (out.success) return JSON.parse(text);
+    if (/"status":\s*"404"|HTTP 404/.test(text + new TextDecoder().decode(out.stderr))) {
+      return null;
+    }
+    throw new Error(`gh api ${path} failed: ${new TextDecoder().decode(out.stderr).trim()}`);
+  },
+  async originUrl(root: string): Promise<string | null> {
+    const out = await new Deno.Command("git", {
+      args: ["-C", root, "remote", "get-url", "origin"],
+      stdout: "piped",
+      stderr: "null",
+    }).output();
+    return out.success ? new TextDecoder().decode(out.stdout).trim() : null;
+  },
+};
+
+/** A root file named LICENSE, LICENCE or COPYING, any case, with or without .md, .txt or .rst. */
+const LICENCE_FILE = /^(?:licen[cs]e|copying)(?:\.(?:md|txt|rst))?$/i;
+
+const OWNER_NAME = /^([A-Za-z0-9-]+)\/([\w.-]+?)(?:\.git)?$/;
+const GITHUB_URL =
+  /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([A-Za-z0-9-]+)\/([\w.-]+?)(?:\.git)?\/?(?:[?#].*)?$/;
+
+/** owner/name from an owner/name or a github.com URL, or null. */
+function ownerName(text: string): string | null {
+  const m = text.trim().match(OWNER_NAME) ?? text.trim().match(GITHUB_URL);
+  return m ? `${m[1]}/${m[2]}` : null;
+}
+
+/** The licence file among the root's file names: GitHub's choice if it is one, else the first by name. */
+function pickFile(names: string[], preferred: string | null): string | null {
+  const matches = names.filter((n) => LICENCE_FILE.test(n)).sort();
+  if (preferred && matches.includes(preferred)) return preferred;
+  return matches[0] ?? null;
+}
+
+/** GitHub's licence for owner/name: its path and SPDX id (null for NOASSERTION or none). */
+async function githubLicence(repo: string): Promise<{ path: string; spdx: string | null } | null> {
+  const body = await io.github(`repos/${repo}/license`) as
+    | { path?: string; license?: { spdx_id?: string | null } }
+    | null;
+  if (!body?.path) return null;
+  const id = body.license?.spdx_id;
+  return { path: body.path, spdx: id && id !== "NOASSERTION" ? id : null };
+}
+
+function answer(file: string | null, spdx: string | null): string {
+  if (!file) return "No: there is no licence file at the root.";
+  return spdx ? `Yes: ${file} (${spdx}).` : `Yes: ${file}.`;
+}
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await Deno.lstat(path);
+    return true;
+  } catch (e) {
+    if (e instanceof Deno.errors.NotFound) return false;
+    throw e;
+  }
+}
+
+/** The nearest directory at or above `dir` that holds `.git` (a directory, or a worktree's file). */
+async function gitRoot(dir: string): Promise<string | null> {
+  let d = dir;
+  while (true) {
+    if (await exists(`${d}/.git`)) return d;
+    const parent = d.replace(/\/[^/]+$/, "") || "/";
+    if (parent === d) return null;
+    d = parent;
+  }
+}
+
+async function checkGithub(repo: string): Promise<Licence> {
+  const listing = await io.github(`repos/${repo}/contents/`);
+  if (!Array.isArray(listing)) {
+    throw new Error(`GitHub could not show the root of ${repo}`);
+  }
+  const names = (listing as Array<{ name?: string; type?: string }>)
+    .filter((e) => e.type === "file" && typeof e.name === "string")
+    .map((e) => e.name as string);
+  const licence = names.some((n) => LICENCE_FILE.test(n)) ? await githubLicence(repo) : null;
+  const file = pickFile(names, licence?.path ?? null);
+  const spdx = file && licence?.path === file ? licence.spdx : null;
+  return {
+    found: file !== null,
+    inGitRepository: true,
+    file,
+    spdx,
+    checked: "github",
+    repository: repo,
+    answer: answer(file, spdx),
+  };
+}
+
+async function checkLocal(path: string): Promise<Licence> {
+  let dir: string;
+  try {
+    dir = await Deno.realPath(path);
+  } catch (e) {
+    if (e instanceof Deno.errors.NotFound) throw new Error(`${path} does not exist`);
+    throw e;
+  }
+  const root = await gitRoot(dir);
+  if (!root) {
+    return {
+      found: false,
+      inGitRepository: false,
+      file: null,
+      spdx: null,
+      checked: "local",
+      repository: dir,
+      answer: `${dir} is not in a git repository.`,
+    };
+  }
+  const names: string[] = [];
+  for await (const e of Deno.readDir(root)) {
+    if (e.isFile && LICENCE_FILE.test(e.name)) names.push(e.name);
+  }
+  const file = pickFile(names, null);
+  let spdx: string | null = null;
+  if (file) {
+    const origin = await io.originUrl(root);
+    const repo = origin && GITHUB_URL.test(origin) ? ownerName(origin) : null;
+    if (repo) {
+      try {
+        const licence = await githubLicence(repo);
+        if (licence?.path === file) spdx = licence.spdx;
+      } catch {
+        // The SPDX name is extra: the local answer stands without it.
+      }
+    }
+  }
+  return {
+    found: file !== null,
+    inGitRepository: true,
+    file,
+    spdx,
+    checked: "local",
+    repository: root,
+    answer: answer(file, spdx),
+  };
+}
+
+/**
  * Say whether a git repository has a licence file at its root, which file it is, and the licence's SPDX name when GitHub reports one.
  *
- * TODO(draft): implement. Returns no items until then.
+ * With `repo` set, its default branch is checked on GitHub; otherwise the git
+ * repository `path` is in is checked at its working-tree root. Reads only.
  */
-export function run(_args: RunArgs, _settings: GlobalArgs): Promise<unknown[]> {
-  return Promise.resolve([]);
+export async function run(args: RunArgs, _settings: GlobalArgs): Promise<Licence[]> {
+  if (args.repo.trim() !== "") {
+    const repo = ownerName(args.repo);
+    if (!repo) {
+      throw new Error(`repo must be owner/name or a github.com URL, not "${args.repo}"`);
+    }
+    return [await checkGithub(repo)];
+  }
+  return [await checkLocal(args.path)];
 }
 
 /** What the run method calls. Tests swap `run` here to check the wiring without the real behaviour. */
