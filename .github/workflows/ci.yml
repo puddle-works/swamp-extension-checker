@@ -22,7 +22,33 @@ jobs:
     uses: puddle-works/puddle-tooling/.github/workflows/guardrails-check.yml@v0.1.1
     with:
       tooling-ref: v0.1.1
+  # The publish dry run fails with "Version ... already exists" once the
+  # manifest version is on the registry. Skip it then; a new version runs it again.
+  version-check:
+    runs-on: ubuntu-24.04
+    outputs:
+      published: ${{ steps.check.outputs.published }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - id: check
+        run: |
+          name=$(sed -n 's/^name: *"\(.*\)"/\1/p' manifest.yaml)
+          version=$(sed -n 's/^version: *"\(.*\)"/\1/p' manifest.yaml)
+          code=$(curl -sL -o versions.json -w '%{http_code}' \
+            "https://swamp.club/api/v1/extensions/${name}/versions?perPage=100")
+          case "$code" in
+            200) jq -e --arg v "$version" '.versions | any(.version == $v)' versions.json >/dev/null \
+                   && published=true || published=false ;;
+            404) published=false ;;
+            *) echo "registry answered HTTP $code" >&2; exit 1 ;;
+          esac
+          echo "$name $version published=$published"
+          echo "published=$published" >> "$GITHUB_OUTPUT"
   publish:
+    needs: version-check
+    if: needs.version-check.outputs.published != 'true'
     uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.1.1
     with:
       visibility: public # must equal visibility: in manifest.yaml
