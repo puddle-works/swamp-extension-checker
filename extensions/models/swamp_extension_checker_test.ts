@@ -382,6 +382,12 @@ Deno.test("AC6: the recipe calls this extension's run method and reads its resul
   assertEquals(r.each, { path: "items", line: "{answer}" });
 });
 
+Deno.test("the recipe's answer when there is nothing to show is the agreed spec's whenEmpty", async () => {
+  // Capture releases a request only when the published recipe's empty is
+  // exactly the agreed whenEmpty (puddleworks-capture#27, #28).
+  assertEquals((await recipe()).empty, "No licence file found.");
+});
+
 Deno.test("the recipe matches the spec's named-repository phrasings and no others", async () => {
   const pattern = new RegExp((await recipe()).pattern as string, "i");
   for (

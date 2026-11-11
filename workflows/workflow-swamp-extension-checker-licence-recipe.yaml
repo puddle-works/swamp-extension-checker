@@ -5,7 +5,7 @@ version: 1
 tags:
   maxReruns: "5"
   maxWallClock: "30m"
-  puddlerouterRecipe: '{"id":"swamp-extension-checker-licence","extension":"@puddleworks/swamp-extension-checker","pattern":"^does ([\\w.-]+/[\\w.-]+) have an? licen[cs]e(?: file)?[?.!]?$","dataName":"result","inputs":{"repo":{"capture":1,"as":"repo"}},"each":{"path":"items","line":"{answer}"},"template":"{lines}"}'
+  puddlerouterRecipe: '{"id":"swamp-extension-checker-licence","extension":"@puddleworks/swamp-extension-checker","pattern":"^does ([\\w.-]+/[\\w.-]+) have an? licen[cs]e(?: file)?[?.!]?$","dataName":"result","inputs":{"repo":{"capture":1,"as":"repo"}},"each":{"path":"items","line":"{answer}"},"template":"{lines}","empty":"No licence file found."}'
 
 inputs:
   type: object
