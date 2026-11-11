@@ -321,8 +321,17 @@ interface MethodContext {
 /** The `@puddleworks/swamp-extension-checker` model: one `run` method that writes one result. */
 export const model = {
   type: "@puddleworks/swamp-extension-checker",
-  version: "2026.10.30.1",
+  version: "2026.11.11.1",
   globalArguments: GlobalArgsSchema,
+  // Moves existing instances' typeVersion along; the settings are unchanged.
+  upgrades: [
+    {
+      toVersion: "2026.11.11.1",
+      description:
+        'The licence recipe answers "No licence file found." when there is nothing to show; no settings changed',
+      upgradeAttributes: (old: Record<string, unknown>) => old,
+    },
+  ],
   resources: {
     result: {
       description:
